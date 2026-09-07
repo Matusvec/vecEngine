@@ -3,6 +3,7 @@
 //
 //   SPACE  take off (refused while this tail is held)     F  toggle aileron actuator failure
 //   C      fleet overview camera                          R  back to the ramp
+//   Mouse  orbit the camera around the aircraft (eases back behind it when idle)
 //   W/S throttle, Up/Down pitch, Left/Right bank, ESC quit
 //
 // Env: BLACKBOX_TAIL (N101), BLACKBOX_UDP_PORT (5005), BLACKBOX_HOLDS (../../palantir/bridge/holds.json),
@@ -11,6 +12,8 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
+#include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
 #include <string>
@@ -128,8 +131,8 @@ int main() {
 		ShadowMap shadowMap(2048);
 		constexpr int SHADOW_UNIT = 1;
 		Frustum frustum;
-		// Drop any CC0 aircraft at assets/plane.obj (or point BLACKBOX_MODEL at one); yaw fixes models that face +Z/+X.
-		PlaneModel planeModel(envOr("BLACKBOX_MODEL", "assets/plane.obj"), std::stof(envOr("BLACKBOX_MODEL_YAW", "90")), envOr("BLACKBOX_PROP", "assets/propeller.obj"));
+		// Box plane by default. Opt into a model with BLACKBOX_MODEL=assets/plane.obj (BLACKBOX_MODEL_YAW turns its nose to -Z).
+		PlaneModel planeModel(envOr("BLACKBOX_MODEL", ""), std::stof(envOr("BLACKBOX_MODEL_YAW", "90")), envOr("BLACKBOX_PROP", ""));
 		Shader markingShader("shaders/plane.vert", "shaders/plane.frag");  // untextured, tinted, fogged: fine for tarmac
 		Mesh farGround = makeQuad({0.0f, GROUND - 0.3f, 0.0f}, 3000.0f, 3000.0f);
 		// Grass airfield with one paved runway ahead of the ramp (aircraft face -Z), centreline dashes and edge lines.
@@ -157,6 +160,8 @@ int main() {
 		Terrain terrain(14, 16, 32.0f);
 		Grass grass(-10.0f, 240.0f, 2.0f);
 
+		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);  // mouse orbits the camera, never leaves the window
+		float orbitYaw = 0.0f, orbitPitch = 0.0f;  // mouse offsets from the default chase view, drift back when idle
 		bool parked = true, actuatorFailing = false, overview = false;
 		bool wasSpace = false, wasFail = false, wasCam = false, wasReset = false;
 		float lastFrame = 0.0f;
@@ -201,6 +206,23 @@ int main() {
 			if (!parked && controller.position.y < GROUND + 1.2f) {  // flat world: never go below the ramp
 				controller.position.y = GROUND + 1.2f;
 				if (controller.pitch < 0.0f) controller.pitch = 0.0f;
+			}
+			// Third-person orbit camera: mouse swings it around the aircraft, and it eases back behind when idle.
+			orbitYaw += input.mouseDeltaX() * 0.12f;
+			orbitPitch = std::clamp(orbitPitch - input.mouseDeltaY() * 0.12f, -50.0f, 60.0f);
+			orbitYaw -= orbitYaw * std::min(1.0f, dt * 0.6f);
+			orbitPitch -= orbitPitch * std::min(1.0f, dt * 0.6f);
+			{
+				float camYaw = controller.yaw + orbitYaw;
+				float camPitch = std::clamp(controller.pitch * 0.4f - 10.0f + orbitPitch, -80.0f, 80.0f);
+				float cy = glm::radians(camYaw), cp = glm::radians(camPitch);
+				glm::vec3 fwd{std::cos(cy) * std::cos(cp), std::sin(cp), std::sin(cy) * std::cos(cp)};
+				camera.position = controller.position - fwd * 18.0f;
+				camera.position.y = std::max(camera.position.y, GROUND + 1.5f);
+				camera.yaw = camYaw;
+				camera.pitch = camPitch;
+				camera.roll = 0.0f;
+				camera.updateVectors();
 			}
 			if (overview) {  // pull-back shot: high and behind the ramp, looking down the line of aircraft
 				camera.position = {0.0f, GROUND + 90.0f, 170.0f};
