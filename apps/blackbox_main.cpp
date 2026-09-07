@@ -70,7 +70,12 @@ int main() {
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_SAMPLES, 4);
+	if (const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor())) {  // fill the monitor, still a window
+		fbWidth = mode->width;
+		fbHeight = mode->height;
+	}
 	GLFWwindow* window = glfwCreateWindow(fbWidth, fbHeight, "BLACKBOX", nullptr, nullptr);
+	glfwMaximizeWindow(window);
 	if (!window) { std::cerr << "no window\n"; glfwTerminate(); return 1; }
 	glfwMakeContextCurrent(window);
 	glfwSetFramebufferSizeCallback(window, onResize);
