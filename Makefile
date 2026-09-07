@@ -18,3 +18,6 @@ test:
 
 clean:
 	rm -rf build
+
+blackbox: all
+	./build/blackbox

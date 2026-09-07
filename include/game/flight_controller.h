@@ -65,6 +65,7 @@ public:
 	float yawFromRoll = 1.1f;      // larger = sharper banked turns
 	float stallSpeed = 30.0f;
 	float gravity = 18.0f;
+	bool mouseTrim = true;         // BLACKBOX turns this off, the sim flies on keys only
 
 	float speed() const;
 	glm::vec3 forward() const;

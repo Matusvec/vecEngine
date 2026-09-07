@@ -81,6 +81,36 @@ endif()
 endif()  # BUILD_FLIGHT_GAME
 
 # -----------------------------------------------------------------------------
+# BLACKBOX: the flight scene without the game (apps/blackbox_main.cpp)
+add_executable(blackbox
+    apps/blackbox_main.cpp
+    src/camera.cpp
+    src/flight_controller.cpp
+    src/frustum.cpp
+    src/grass.cpp
+    src/holds.cpp
+    src/input.cpp
+    src/light.cpp
+    src/mesh.cpp
+    src/overlay.cpp
+    src/plane_model.cpp
+    src/shader.cpp
+    src/shadow_map.cpp
+    src/skybox.cpp
+    src/telemetry.cpp
+    src/terrain.cpp
+    src/texture.cpp
+    src/transform.cpp
+    vendor/src/glad.c
+)
+target_include_directories(blackbox PRIVATE ${CMAKE_SOURCE_DIR}/vendor/include ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(blackbox PRIVATE glfw OpenGL::GL)
+if(TARGET glm::glm)
+    target_link_libraries(blackbox PRIVATE glm::glm)
+elseif(GLM_INCLUDE_DIR)
+    target_include_directories(blackbox PRIVATE ${GLM_INCLUDE_DIR})
+endif()
+
 # Unit tests — pure-logic only (no GL context needed at runtime). Links glad.c
 # so GL function-pointer symbols resolve, but never calls the loader so all the
 # pointers stay null and harmless.

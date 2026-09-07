@@ -36,6 +36,9 @@ public:
 
 	static float heightAt(float x, float z);
 
+	// BLACKBOX: make the whole world one flat plane at this height (set before constructing Terrain).
+	static void setFlat(float height);
+
 	// Carve a crater into the terrain. Center XZ is the crater center; radius is the
 	// XZ falloff distance; depth is the maximum sink at the center. Affects heightAt
 	// globally (so grass placement also lowers automatically) and immediately

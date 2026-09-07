@@ -111,10 +111,12 @@ void PlaneModel::draw(const glm::mat4& view, const glm::mat4& projection,
                       const glm::vec3& position,
                       float yawDeg, float pitchDeg, float rollDeg,
                       float time, float throttle,
-                      float pitchInputN, float rollInputN) const {
+                      float pitchInputN, float rollInputN,
+                      const glm::vec3& tint) const {
 	glm::mat4 planeM = orientPlane(position, yawDeg, pitchDeg, rollDeg);
 
 	shader.use();
+	shader.setVec3("tint", tint);
 	shader.setMat4("view", view);
 	shader.setMat4("projection", projection);
 

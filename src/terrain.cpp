@@ -80,7 +80,12 @@ inline float craterDepression(float x, float z) {
 // Noise-based alpine heightmap. No sin/cos — uses value-noise FBM with domain
 // warping for irregular mountain placement and ridged-multifractal peaks.
 // Output range roughly [-60, +330].
+static bool g_flat = false;
+static float g_flatHeight = 0.0f;
+void Terrain::setFlat(float height) { g_flat = true; g_flatHeight = height; }
+
 float Terrain::heightAt(float x, float z) {
+	if (g_flat) return g_flatHeight - craterDepression(x, z);
 	// Continent-scale undulation — broad valleys and uplands.
 	float continent = fbm(x * 0.0014f, z * 0.0014f, 3) * 75.0f;
 

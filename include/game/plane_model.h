@@ -19,7 +19,8 @@ public:
 	          const glm::vec3& position,
 	          float yawDeg, float pitchDeg, float rollDeg,
 	          float time, float throttle,
-	          float pitchInputN, float rollInputN) const;
+	          float pitchInputN, float rollInputN,
+	          const glm::vec3& tint = glm::vec3(1.0f)) const;
 
 private:
 	Mesh bodyMesh;

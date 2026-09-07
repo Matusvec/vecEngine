@@ -114,8 +114,10 @@ void FlightController::update(float dt, const Input& input) {
 
 	// Mouse: optional fine yaw/pitch trim (very subtle so the plane stays
 	// the primary control).
-	yaw   += input.mouseDeltaX() * 0.04f;
-	pitch -= input.mouseDeltaY() * 0.04f;
+	if (mouseTrim) {
+		yaw   += input.mouseDeltaX() * 0.04f;
+		pitch -= input.mouseDeltaY() * 0.04f;
+	}
 	pitch = std::clamp(pitch, -maxPitch, maxPitch);
 
 	// Compute target velocity: forward * throttle-driven target speed.
