@@ -327,6 +327,9 @@ int main() {
 			}
 			if (held) {
 				glfwSetWindowTitle(window, ("*** " + tail + " IS HELD BY MAINTENANCE, grounded until released ***").c_str());
+			} else if (actuatorFailing) {
+				glfwSetWindowTitle(window, ("*** " + tail + ": AILERON ACTUATOR FAILING (tau " + std::to_string(failingTau).substr(0, 4)
+				                            + " s), press F to heal ***").c_str());
 			}
 
 			terrain.update(camera.position);
