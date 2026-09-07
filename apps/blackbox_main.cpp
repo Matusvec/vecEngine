@@ -109,6 +109,7 @@ int main() {
 		controller.mouseTrim = false;
 		controller.toggleView();  // third person from the start
 		controller.freeze();      // parked
+		controller.throttle = 0.0f;  // engine off on the ramp
 		// Calmer trainer-like handling than the arcade game. Units are metres and seconds.
 		// ponytail: tuned by feel, not aero; add lift/drag if the video needs real energy management
 		controller.minSpeed = 45.0f;        // stall-ish floor
@@ -128,7 +129,7 @@ int main() {
 		constexpr int SHADOW_UNIT = 1;
 		Frustum frustum;
 		// Drop any CC0 aircraft at assets/plane.obj (or point BLACKBOX_MODEL at one); yaw fixes models that face +Z/+X.
-		PlaneModel planeModel(envOr("BLACKBOX_MODEL", "assets/plane.obj"), std::stof(envOr("BLACKBOX_MODEL_YAW", "-90")));
+		PlaneModel planeModel(envOr("BLACKBOX_MODEL", "assets/plane.obj"), std::stof(envOr("BLACKBOX_MODEL_YAW", "90")), envOr("BLACKBOX_PROP", "assets/propeller.obj"));
 		Shader markingShader("shaders/plane.vert", "shaders/plane.frag");  // untextured, tinted, fogged: fine for tarmac
 		Mesh farGround = makeQuad({0.0f, GROUND - 0.3f, 0.0f}, 3000.0f, 3000.0f);
 		// Grass airfield with one paved runway ahead of the ramp (aircraft face -Z), centreline dashes and edge lines.
@@ -186,6 +187,7 @@ int main() {
 				parked = true;
 				controller.reset(rampSlot(flownIndex));
 				controller.freeze();
+				controller.throttle = 0.0f;
 			}
 			if (pressedEdge(input, GLFW_KEY_F, wasFail)) {
 				actuatorFailing = !actuatorFailing;

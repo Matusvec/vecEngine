@@ -20,7 +20,8 @@ class PlaneModel {
 public:
 	// If objPath names a readable OBJ, the whole aircraft is that model (no animated parts);
 	// otherwise the built-in box plane is used. yawDeg fixes models that do not face -Z.
-	explicit PlaneModel(const std::string& objPath = "", float yawDeg = 0.0f);
+	// propellerPath: optional OBJ spun at the body's nose (its thin axis is detected and stood up).
+	explicit PlaneModel(const std::string& objPath = "", float yawDeg = 0.0f, const std::string& propellerPath = "");
 
 	// Depth-only draw for the shadow pass (body only, that is what casts the shadow).
 	void drawDepth(const Shader& depthShader, const glm::vec3& position,
@@ -42,4 +43,7 @@ private:
 	Shader shader;
 	bool customModel = false;
 	std::unique_ptr<Texture> albedo;  // from the OBJ's material, if any
+	std::unique_ptr<Texture> propellerAlbedo;
+	bool customPropeller = false;
+	glm::vec3 nose{0.0f, 0.0f, -2.7f};  // where the propeller spins, in plane-local space
 };
