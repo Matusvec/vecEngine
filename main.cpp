@@ -3,10 +3,13 @@
 #include <glm/glm.hpp>
 
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 #include <random>
 #include <vector>
 
+#include "blackbox/holds.h"
+#include "blackbox/telemetry.h"
 #include "core/input.h"
 #include "game/balloon.h"
 #include "game/flight_controller.h"
@@ -54,6 +57,9 @@ int main() {
 	          << "  R             restart\n"
 	          << "  SPACE         start game\n"
 	          << "  ESC           quit\n"
+	          << "  F             BLACKBOX: toggle aileron actuator failure\n"
+	          << "\nBLACKBOX env: BLACKBOX_TAIL (N101), BLACKBOX_UDP_PORT (5005),\n"
+	          << "  BLACKBOX_HOLDS (../../palantir/bridge/holds.json), BLACKBOX_FAILING_TAU (0.6)\n"
 	          << "\nGoal: pop every balloon + fly through every ring.\n"
 	          << "Lose if you crash into the ground.\n"
 	          << ">>> PRESS SPACE TO START <<<\n\n";
@@ -204,6 +210,22 @@ int main() {
 			/*radius=*/14.0f);
 		Game game(balloons, rings, controller, window);
 
+		// BLACKBOX wiring. Everything configurable lives in env vars so the same
+		// binary can play N101 today and N104 tomorrow.
+		auto envOr = [](const char* key, const char* fallback) {
+			const char* v = std::getenv(key);
+			return std::string(v && *v ? v : fallback);
+		};
+		const std::string tail = envOr("BLACKBOX_TAIL", "N101");
+		const float healthyTau = 0.05f;
+		const float failingTau = std::stof(envOr("BLACKBOX_FAILING_TAU", "0.6"));
+		Telemetry telemetry("127.0.0.1", std::stoi(envOr("BLACKBOX_UDP_PORT", "5005")));
+		Holds holds(envOr("BLACKBOX_HOLDS", "../../palantir/bridge/holds.json"));
+		bool actuatorFailing = false;
+		bool wasFailDown = false;
+		double lastTelemetry = 0.0;
+		std::cerr << "BLACKBOX: flying " << tail << ", failing tau " << failingTau << " s\n";
+
 		// Print ring positions at startup so the player knows where to fly.
 		std::cerr << "\nRing course (fly through them in order):\n";
 		for (int i = 0; i < rings.total(); ++i) {
@@ -234,11 +256,26 @@ int main() {
 			}
 
 			// SPACE-press edge → start the game from the MENU screen.
+			holds.poll(currentFrame);
+			const bool held = holds.isHeld(tail);
+
 			bool isSpaceDown = input.isKeyPressed(GLFW_KEY_SPACE);
 			if (isSpaceDown && !wasSpaceDown && game.state() == Game::State::MENU) {
-				game.startPlaying();
+				if (held) std::cerr << "BLACKBOX: " << tail << " is HELD by maintenance, cannot take off\n";
+				else game.startPlaying();
 			}
 			wasSpaceDown = isSpaceDown;
+
+			// F-press edge → toggle the actuator failure. Foundry never sees this flag,
+			// it only sees the telemetry.
+			bool isFailDown = input.isKeyPressed(GLFW_KEY_F);
+			if (isFailDown && !wasFailDown) {
+				actuatorFailing = !actuatorFailing;
+				controller.aileronTau = actuatorFailing ? failingTau : healthyTau;
+				std::cerr << "BLACKBOX: aileron actuator " << (actuatorFailing ? "FAILING" : "healthy")
+				          << " (tau " << controller.aileronTau << " s)\n";
+			}
+			wasFailDown = isFailDown;
 
 			// V-press edge → toggle camera view (cockpit / chase).
 			bool isViewDown = input.isKeyPressed(GLFW_KEY_V);
@@ -250,7 +287,7 @@ int main() {
 			// R-press edge → restart everything (plane, score, balloons, rings,
 			// missiles, terrain craters).
 			bool isResetDown = input.isKeyPressed(GLFW_KEY_R);
-			if (isResetDown && !wasResetDown) {
+			if (isResetDown && !wasResetDown && !held) {
 				balloons.reset();
 				rings.reset();
 				missiles.clear();
@@ -282,6 +319,15 @@ int main() {
 
 			// Game tick handles crash detection + win check.
 			game.update(deltaTime);
+
+			// BLACKBOX: 5 Hz telemetry while airborne, and a held banner that wins over the HUD.
+			if (game.state() == Game::State::PLAYING && currentFrame - lastTelemetry >= 0.2f) {
+				telemetry.send(tail, "aileron_l", controller.aileronCmdDeg, controller.aileronMeasDeg);
+				lastTelemetry = currentFrame;
+			}
+			if (held) {
+				glfwSetWindowTitle(window, ("*** " + tail + " IS HELD BY MAINTENANCE, grounded until released ***").c_str());
+			}
 
 			terrain.update(camera.position);
 			grass.update(camera.position, glfwGetTime());
@@ -351,7 +397,8 @@ int main() {
 			// LOST = red, WON = green. PLAYING draws nothing.
 			switch (game.state()) {
 				case Game::State::MENU:
-					overlay.drawTinted({0.00f, 0.06f, 0.16f}, 0.55f);
+					if (held) overlay.drawTinted({0.55f, 0.04f, 0.04f}, 0.55f);
+					else overlay.drawTinted({0.00f, 0.06f, 0.16f}, 0.55f);
 					break;
 				case Game::State::LOST:
 					overlay.drawTinted({0.55f, 0.04f, 0.04f}, 0.45f);

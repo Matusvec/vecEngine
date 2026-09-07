@@ -24,6 +24,8 @@ void FlightController::reset(const glm::vec3& spawnPos) {
 	throttle = 0.20f;
 	pitchInput = 0.0f;
 	rollInput = 0.0f;
+	aileronCmdDeg = 0.0f;
+	aileronMeasDeg = 0.0f;
 	syncCamera();
 	velocity = forward() * (minSpeed + (maxSpeed - minSpeed) * throttle);
 }
@@ -92,8 +94,14 @@ void FlightController::update(float dt, const Input& input) {
 	if (input.isKeyPressed(GLFW_KEY_LEFT))  rollIn -= 1.0f;
 	if (input.isKeyPressed(GLFW_KEY_RIGHT)) rollIn += 1.0f;
 	rollInput = rollIn;
-	if (rollIn != 0.0f) {
-		roll += rollIn * rollRate * dt;
+
+	// BLACKBOX: actuator lag. The surface chases the command; roll follows the surface.
+	aileronCmdDeg = rollIn * maxAileronDeg;
+	// Exact first-order response for this frame, stable for any dt and matches the estimator's model.
+	aileronMeasDeg += (aileronCmdDeg - aileronMeasDeg) * (1.0f - std::exp(-dt / std::max(aileronTau, 1e-3f)));
+	float effectiveRoll = aileronMeasDeg / maxAileronDeg;
+	if (std::fabs(effectiveRoll) > 0.02f) {
+		roll += effectiveRoll * rollRate * dt;
 	} else {
 		// Smooth pull-back to wings-level.
 		roll *= std::max(0.0f, 1.0f - autoLevelRate * dt);

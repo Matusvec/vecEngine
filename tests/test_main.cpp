@@ -8,12 +8,14 @@
 #include "renderer/camera.h"
 #include "renderer/frustum.h"
 #include "world/terrain.h"
+#include "blackbox/holds.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <cmath>
 #include <cstdio>
+#include <fstream>
 
 namespace {
 
@@ -116,6 +118,29 @@ void test_camera_basis_vectors() {
 	check(nearly(cam3.front.y, 1.0f, 1e-3f), "pitch=90 -> front.y ~ 1");
 }
 
+
+// =============================================================================
+// Test 5 (BLACKBOX): Holds reads the bridge file and re-reads after the interval.
+// =============================================================================
+void test_holds_parsing() {
+	std::printf("Test: Holds parsing\n");
+	const char* path = "/tmp/vecengine_holds_test.json";
+	{ std::ofstream f(path); f << "{\"held\": [\"N101\", \"N104\"], \"updated\": \"x\"}"; }
+	Holds holds(path);
+	holds.poll(0.0);
+	check(holds.isHeld("N101") && holds.isHeld("N104") && !holds.isHeld("N103"), "parses held tails");
+
+	{ std::ofstream f(path); f << "{\"held\": []}"; }
+	holds.poll(1.0);
+	check(holds.isHeld("N101"), "does not re-read before the interval");
+	holds.poll(3.0);
+	check(!holds.isHeld("N101"), "re-reads after the interval and clears");
+
+	Holds missing("/tmp/does_not_exist_vecengine.json");
+	missing.poll(0.0);
+	check(!missing.isHeld("N101"), "missing file means nothing held");
+}
+
 int main() {
 	std::printf("Running vecEngine unit tests...\n\n");
 
@@ -123,6 +148,7 @@ int main() {
 	test_heightAt_varies();
 	test_frustum_culling();
 	test_camera_basis_vectors();
+	test_holds_parsing();
 
 	std::printf("\n%d/%d checks passed\n", totalChecks - failedChecks, totalChecks);
 	return failedChecks == 0 ? 0 : 1;

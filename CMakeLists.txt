@@ -44,6 +44,7 @@ add_executable(flight
     src/frustum.cpp
     src/game.cpp
     src/grass.cpp
+    src/holds.cpp
     src/input.cpp
     src/light.cpp
     src/mesh.cpp
@@ -56,6 +57,7 @@ add_executable(flight
     src/shadow_map.cpp
     src/shrubs.cpp
     src/skybox.cpp
+    src/telemetry.cpp
     src/terrain.cpp
     src/texture.cpp
     src/transform.cpp
@@ -86,6 +88,7 @@ endif()  # BUILD_FLIGHT_GAME
 add_executable(flight_tests
     tests/test_main.cpp
     src/camera.cpp
+    src/holds.cpp
     src/frustum.cpp
     src/mesh.cpp
     src/shader.cpp

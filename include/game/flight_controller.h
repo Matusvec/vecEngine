@@ -44,6 +44,15 @@ public:
 	float pitchInput = 0.0f;
 	float rollInput  = 0.0f;
 
+	// BLACKBOX: left aileron actuator model. Roll is driven by the MEASURED
+	// deflection, which chases the commanded deflection with a first-order lag.
+	// Healthy tau ~0.05 s is imperceptible; failing tau ~0.6 s feels sluggish.
+	// ponytail: first-order lag only, no rate limit, add one if the detector needs it
+	float aileronCmdDeg = 0.0f;
+	float aileronMeasDeg = 0.0f;
+	float maxAileronDeg = 20.0f;
+	float aileronTau = 0.05f;
+
 	// Tunables — exposed so we can tweak feel from main if needed.
 	float minSpeed = 25.0f;
 	float maxSpeed = 240.0f;
