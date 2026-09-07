@@ -90,6 +90,18 @@ int main() {
 		controller.mouseTrim = false;
 		controller.toggleView();  // third person from the start
 		controller.freeze();      // parked
+		// Calmer trainer-like handling than the arcade game. Units are metres and seconds.
+		// ponytail: tuned by feel, not aero; add lift/drag if the video needs real energy management
+		controller.minSpeed = 45.0f;        // stall-ish floor
+		controller.maxSpeed = 150.0f;       // ~290 kt
+		controller.speedSmoothing = 0.5f;   // throttle takes a couple of seconds to bite
+		controller.pitchRate = 20.0f;       // deg/s
+		controller.maxPitch = 25.0f;
+		controller.rollRate = 70.0f;        // deg/s at full aileron
+		controller.maxRoll = 60.0f;
+		controller.autoLevelRate = 1.0f;
+		controller.yawFromRoll = 0.45f;     // 60 deg bank -> 27 deg/s turn
+		controller.stallSpeed = 40.0f;
 		Skybox skybox;
 		Overlay overlay;
 		LightingSystem lighting;
@@ -136,7 +148,7 @@ int main() {
 					std::cerr << "BLACKBOX: " << tail << " is HELD by maintenance, take-off refused\n";
 				} else {
 					parked = false;
-					controller.pitch = 12.0f;   // rotate and climb; the pilot takes it from here
+					controller.pitch = 8.0f;    // rotate and climb; the pilot takes it from here
 					controller.throttle = 0.6f;
 					controller.unfreeze();
 					std::cerr << "BLACKBOX: " << tail << " airborne\n";
