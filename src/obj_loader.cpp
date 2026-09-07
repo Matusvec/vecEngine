@@ -59,18 +59,14 @@ bool parseObj(const std::string& path, float targetWidth, float yawDeg,
 	}
 	if (verts.empty()) return false;
 
+	// Turn the model to face -Z first, then fit: the wingspan is measured after the turn.
+	glm::mat3 turn = glm::mat3(glm::rotate(glm::mat4(1.0f), glm::radians(yawDeg), glm::vec3(0, 1, 0)));
+	for (auto& v : verts) { v.position = turn * v.position; v.normal = glm::normalize(turn * v.normal); }
 	glm::vec3 lo = verts[0].position, hi = verts[0].position;
 	for (const auto& v : verts) { lo = glm::min(lo, v.position); hi = glm::max(hi, v.position); }
 	glm::vec3 center = (lo + hi) * 0.5f;
 	float scale = targetWidth / std::max(hi.x - lo.x, 1e-4f);
-	glm::mat4 fix = glm::rotate(glm::mat4(1.0f), glm::radians(yawDeg), glm::vec3(0, 1, 0))
-	              * glm::scale(glm::mat4(1.0f), glm::vec3(scale))
-	              * glm::translate(glm::mat4(1.0f), -center);
-	glm::mat3 normalFix = glm::mat3(glm::rotate(glm::mat4(1.0f), glm::radians(yawDeg), glm::vec3(0, 1, 0)));
-	for (auto& v : verts) {
-		v.position = glm::vec3(fix * glm::vec4(v.position, 1.0f));
-		v.normal = glm::normalize(normalFix * v.normal);
-	}
+	for (auto& v : verts) v.position = (v.position - center) * scale;
 	return true;
 }
 

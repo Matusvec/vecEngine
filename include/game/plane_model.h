@@ -2,6 +2,9 @@
 
 #include "renderer/mesh.h"
 #include "renderer/shader.h"
+#include "renderer/texture.h"
+
+#include <memory>
 
 #include <glm/glm.hpp>
 
@@ -38,4 +41,5 @@ private:
 	Mesh elevatorMesh;
 	Shader shader;
 	bool customModel = false;
+	std::unique_ptr<Texture> albedo;  // from the OBJ's material, if any
 };

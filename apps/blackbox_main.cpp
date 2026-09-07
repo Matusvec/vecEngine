@@ -128,7 +128,7 @@ int main() {
 		constexpr int SHADOW_UNIT = 1;
 		Frustum frustum;
 		// Drop any CC0 aircraft at assets/plane.obj (or point BLACKBOX_MODEL at one); yaw fixes models that face +Z/+X.
-		PlaneModel planeModel(envOr("BLACKBOX_MODEL", "assets/plane.obj"), std::stof(envOr("BLACKBOX_MODEL_YAW", "0")));
+		PlaneModel planeModel(envOr("BLACKBOX_MODEL", "assets/plane.obj"), std::stof(envOr("BLACKBOX_MODEL_YAW", "-90")));
 		Shader markingShader("shaders/plane.vert", "shaders/plane.frag");  // untextured, tinted, fogged: fine for tarmac
 		Mesh farGround = makeQuad({0.0f, GROUND - 0.3f, 0.0f}, 3000.0f, 3000.0f);
 		// Grass airfield with one paved runway ahead of the ramp (aircraft face -Z), centreline dashes and edge lines.

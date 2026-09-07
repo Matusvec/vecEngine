@@ -1,6 +1,9 @@
 #include "game/plane_model.h"
 #include "renderer/obj_loader.h"
 
+#include <fstream>
+#include <sstream>
+
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <vector>
@@ -116,7 +119,19 @@ PlaneModel::PlaneModel(const std::string& objPath, float yawDeg)
 	if (!objPath.empty()) {
 		Mesh loaded = loadObj(objPath, /*targetWidth=*/5.6f, yawDeg);  // same wingspan as the box plane
 		if (loaded.indexCount > 0) { bodyMesh = std::move(loaded); customModel = true; }
+		// Texture: the map_Kd of the sibling .mtl, resolved next to the OBJ. ponytail: first material only.
+		std::string dir = objPath.substr(0, objPath.find_last_of('/') + 1);
+		std::string stem = objPath.substr(0, objPath.find_last_of('.'));
+		std::ifstream mtl(stem + ".mtl");
+		std::string line;
+		while (customModel && std::getline(mtl, line)) {
+			std::istringstream s(line);
+			std::string key, value;
+			if (s >> key >> value && key == "map_Kd") { albedo = std::make_unique<Texture>(dir + value); break; }
+		}
 	}
+	shader.use();
+	shader.setInt("albedo", 0);
 }
 
 void PlaneModel::drawDepth(const Shader& depthShader, const glm::vec3& position,
@@ -135,6 +150,8 @@ void PlaneModel::draw(const glm::mat4& view, const glm::mat4& projection,
 
 	shader.use();
 	shader.setVec3("tint", tint);
+	shader.setInt("useTexture", albedo ? 1 : 0);
+	if (albedo) albedo->bind(0);
 	shader.setMat4("view", view);
 	shader.setMat4("projection", projection);
 

@@ -8,6 +8,7 @@ uniform mat4 view;
 uniform mat4 projection;
 
 out vec3 Normal;
+out vec2 TexCoords;
 out float FogDistance;
 
 void main() {
@@ -16,4 +17,5 @@ void main() {
     vec4 viewPos = view * worldPos;
     gl_Position = projection * viewPos;
     FogDistance = -viewPos.z;
+    TexCoords = aTexCoords;
 }
