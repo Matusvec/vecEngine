@@ -47,7 +47,7 @@ void main() {
     t = pow(t, 0.65);
     vec3 sky = mix(HORIZON, ZENITH, t);
 
-    float below = clamp(-dir.y * 1.5, 0.0, 1.0);
+    float below = smoothstep(0.08, 0.5, -dir.y);  // fog colour hugs the horizon, so a ground plane never shows an edge
     sky = mix(sky, BELOW, below);
 
     if (dir.y > 0.05) {

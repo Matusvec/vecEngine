@@ -9,10 +9,12 @@
 #include "renderer/frustum.h"
 #include "world/terrain.h"
 #include "blackbox/holds.h"
+#include "renderer/obj_loader.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <fstream>
@@ -141,6 +143,27 @@ void test_holds_parsing() {
 	check(!missing.isHeld("N101"), "missing file means nothing held");
 }
 
+
+// =============================================================================
+// Test 6: OBJ parser handles quads, missing normals, and normalises size/centre.
+// =============================================================================
+void test_obj_parser() {
+	std::printf("Test: OBJ parser\n");
+	const char* path = "/tmp/vecengine_test.obj";
+	{ std::ofstream f(path); f << "# box 2 wide, 1 tall, 4 long, offset from origin\n"
+	    "v 10 0 0\nv 12 0 0\nv 12 1 0\nv 10 1 0\nv 10 0 4\nv 12 0 4\nv 12 1 4\nv 10 1 4\n"
+	    "f 1 2 3 4\nf 5 6 7 8\nf -8 -7 -3 -4\n"; }
+	std::vector<Vertex> v; std::vector<unsigned int> idx;
+	check(parseObj(path, 5.6f, 0.0f, v, idx), "parses a file");
+	check(idx.size() == 3 * 2 * 3, "three quads fan into six triangles");
+	float minX = 1e9f, maxX = -1e9f, cx = 0.0f;
+	for (const auto& vert : v) { minX = std::min(minX, vert.position.x); maxX = std::max(maxX, vert.position.x); cx += vert.position.x; }
+	check(nearly(maxX - minX, 5.6f, 1e-3f), "scaled to the target width");
+	check(nearly(cx / (float)v.size(), 0.0f, 1e-3f), "recentred on the origin");
+	check(nearly(std::fabs(v[0].normal.z), 1.0f, 1e-3f), "flat normal generated for a face without vn");
+	check(!parseObj("/tmp/does_not_exist.obj", 1.0f, 0.0f, v, idx), "missing file returns false");
+}
+
 int main() {
 	std::printf("Running vecEngine unit tests...\n\n");
 
@@ -149,6 +172,7 @@ int main() {
 	test_frustum_culling();
 	test_camera_basis_vectors();
 	test_holds_parsing();
+	test_obj_parser();
 
 	std::printf("\n%d/%d checks passed\n", totalChecks - failedChecks, totalChecks);
 	return failedChecks == 0 ? 0 : 1;

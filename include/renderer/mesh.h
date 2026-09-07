@@ -18,9 +18,10 @@ public:
 
 	static Mesh createCube();
 
+	unsigned int indexCount = 0;  // 0 means empty (e.g. a model file that failed to load)
+
 private:
 	unsigned int VAO = 0;
 	unsigned int VBO = 0;
 	unsigned int EBO = 0;
-	unsigned int indexCount = 0;
 };

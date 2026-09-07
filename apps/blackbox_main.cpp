@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "blackbox/holds.h"
@@ -24,6 +25,7 @@
 #include "renderer/camera.h"
 #include "renderer/frustum.h"
 #include "renderer/light.h"
+#include "renderer/mesh.h"
 #include "renderer/overlay.h"
 #include "renderer/shader.h"
 #include "renderer/shadow_map.h"
@@ -53,6 +55,17 @@ constexpr float GROUND = 30.0f;                 // flat world height, grass band
 const std::vector<std::string> FLEET = {"N101", "N102", "N103", "N104", "N105", "N106"};
 glm::vec3 rampSlot(int i) { return {-75.0f + 30.0f * i, GROUND + 1.2f, 0.0f}; }  // a line of six, 30 m apart
 const glm::vec3 HELD_TINT{1.0f, 0.25f, 0.25f};
+
+// Flat rectangle in the XZ plane, normal up, world-space UVs so the ground texture tiles.
+Mesh makeQuad(glm::vec3 center, float halfX, float halfZ, float uvScale = 0.05f) {
+	std::vector<Vertex> v;
+	glm::vec3 n{0.0f, 1.0f, 0.0f};
+	for (auto [sx, sz] : {std::pair{-1, -1}, {1, -1}, {1, 1}, {-1, 1}}) {
+		glm::vec3 pos = center + glm::vec3(sx * halfX, 0.0f, sz * halfZ);
+		v.push_back({pos, n, {pos.x * uvScale, pos.z * uvScale}});
+	}
+	return Mesh(v, {0, 2, 1, 0, 3, 2});
+}
 }  // namespace
 
 int main() {
@@ -90,6 +103,7 @@ int main() {
 		Shader shader("shaders/basic.vert", "shaders/basic.frag");
 		Shader depthShader("shaders/shadow_depth.vert", "shaders/shadow_depth.frag");
 		Camera camera(rampSlot(flownIndex), {0.0f, 1.0f, 0.0f}, -90.0f, 0.0f);
+		camera.farPlane = 3000.0f;  // the ground plane reaches the horizon, fog does the rest
 		Input input(window);
 		FlightController controller(camera, rampSlot(flownIndex));
 		controller.mouseTrim = false;
@@ -113,7 +127,16 @@ int main() {
 		ShadowMap shadowMap(2048);
 		constexpr int SHADOW_UNIT = 1;
 		Frustum frustum;
-		PlaneModel planeModel;
+		// Drop any CC0 aircraft at assets/plane.obj (or point BLACKBOX_MODEL at one); yaw fixes models that face +Z/+X.
+		PlaneModel planeModel(envOr("BLACKBOX_MODEL", "assets/plane.obj"), std::stof(envOr("BLACKBOX_MODEL_YAW", "0")));
+		Shader markingShader("shaders/plane.vert", "shaders/plane.frag");  // untextured, tinted, fogged: fine for tarmac
+		Mesh farGround = makeQuad({0.0f, GROUND - 0.3f, 0.0f}, 3000.0f, 3000.0f);
+		// Grass airfield with one paved runway ahead of the ramp (aircraft face -Z), centreline dashes and edge lines.
+		Mesh runway = makeQuad({0.0f, GROUND + 0.05f, -680.0f}, 22.0f, 650.0f);
+		std::vector<Mesh> markings;
+		for (float z = -60.0f; z > -1300.0f; z -= 40.0f) markings.push_back(makeQuad({0.0f, GROUND + 0.10f, z}, 0.6f, 9.0f));
+		markings.push_back(makeQuad({-21.0f, GROUND + 0.10f, -680.0f}, 0.5f, 650.0f));
+		markings.push_back(makeQuad({ 21.0f, GROUND + 0.10f, -680.0f}, 0.5f, 650.0f));
 		Telemetry telemetry("127.0.0.1", std::stoi(envOr("BLACKBOX_UDP_PORT", "5005")));
 		Holds holds(envOr("BLACKBOX_HOLDS", "../../palantir/bridge/holds.json"));
 
@@ -205,7 +228,11 @@ int main() {
 			shadowMap.beginPass();
 			depthShader.use();
 			depthShader.setMat4("lightSpaceMatrix", lightSpace);
-			terrain.drawDepth(depthShader, camera.position);
+			// flat ground cannot shadow itself; only the aircraft cast
+			for (int i = 0; i < (int)FLEET.size(); ++i) {
+				if (i == flownIndex) planeModel.drawDepth(depthShader, controller.position, controller.yaw, controller.pitch, controller.roll);
+				else planeModel.drawDepth(depthShader, rampSlot(i), -90.0f, 0.0f, 0.0f);
+			}
 			shadowMap.endPass(fbWidth, fbHeight);
 
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -220,6 +247,18 @@ int main() {
 			lighting.apply(shader, camera.position, lightSpace, SHADOW_UNIT);
 			frustum.update(projection * view);
 			terrain.draw(shader, frustum, camera.position);
+			shader.setMat4("model", glm::mat4(1.0f));
+			farGround.draw();
+
+			markingShader.use();
+			markingShader.setMat4("view", view);
+			markingShader.setMat4("projection", projection);
+			markingShader.setMat4("model", glm::mat4(1.0f));
+			markingShader.setVec3("tint", {0.30f, 0.30f, 0.32f});
+			runway.draw();
+			markingShader.setVec3("tint", {1.2f, 1.2f, 1.1f});
+			for (const Mesh& m : markings) m.draw();
+
 			grass.draw(view, projection, now, camera.position, lighting, lightSpace, SHADOW_UNIT);
 
 			// The fleet: five parked aircraft plus the flown one. Held tails are red.

@@ -1,0 +1,29 @@
+# Engine backlog (Codex gpt-6-astra review, 2026-09-06)
+
+Done in commit after review: 1 (sky below-horizon + ground plane), 2 (aircraft cast shadows, flat terrain skipped), 5 (fogged early-out), 9 (nearest shadow sampling), 10 (canopy colour, tint uniform). Open: 3, 4, 6, 7, 8, 11, 12.
+
+Ranked by likely impact; source review only, no frame-time measurements.
+
+1. **Visible square terrain edge** — [blackbox_main.cpp:133](/mnt/data/projects/Personal/vecEngine/apps/blackbox_main.cpp:133), [skybox.frag:50](/mnt/data/projects/Personal/vecEngine/shaders/skybox.frag:50). The 29×29 patch is 928 m wide; its sides stop 448–480 m from the camera. Terrain fog becomes `(0.62,0.65,0.70)` at 400 m, but the exposed lower sky darkens toward `BELOW`. The 700 m far plane exposes that boundary. **Cheapest fix:** return `HORIZON` below the sky horizon, before sun glow; use radial terrain fog so every edge is fully fogged regardless of camera orientation.
+
+2. **Flat-world shadow pass does useless work** — [blackbox_main.cpp:204](/mnt/data/projects/Personal/vecEngine/apps/blackbox_main.cpp:204), [terrain.cpp:280](/mnt/data/projects/Personal/vecEngine/src/terrain.cpp:280). Roughly 440 terrain draws/~225k triangles every frame into 2048² depth; flat ground cannot meaningfully shadow itself, and aircraft never enter this pass. **Fix:** omit flat terrain casters; render aircraft depth only, providing missing contact shadows.
+
+3. **Chunk crossings cause synchronous allocation/upload bursts** — [terrain.cpp:164](/mnt/data/projects/Personal/vecEngine/src/terrain.cpp:164), [mesh.cpp:6](/mnt/data/projects/Personal/vecEngine/src/mesh.cpp:6). Crossing one axis rebuilds 29 chunks: 41,905 height evaluations, fresh vectors, VAOs/VBOs/EBOs, and duplicate index uploads. **Fix:** retain buffers and indices; update vertex data only. In BLACKBOX, resolution 1 suffices for the undeformed flat ground.
+
+4. **Vegetation repeatedly rebuilds its entire neighborhood** — [grass.cpp:68](/mnt/data/projects/Personal/vecEngine/src/grass.cpp:68), [shrubs.cpp:97](/mnt/data/projects/Personal/vecEngine/src/shrubs.cpp:97). While moving, every ≥0.5 s scans 58,081/8,649 candidates, reallocates vectors, and uploads all survivors. **Fix:** retain vector capacity and test the cheap patch mask before expensive `heightAt`. These allocations/uploads are periodic, not every frame.
+
+5. **Fully fogged terrain still receives expensive shading** — [terrain.cpp:263](/mnt/data/projects/Personal/vecEngine/src/terrain.cpp:263), [basic.frag:74](/mnt/data/projects/Personal/vecEngine/shaders/basic.frag:74). CPU cutoff is 1600 m despite 400 m fog; fragments still execute noise, specular and nine shadow reads. **Fix:** return fog color before lighting when fully fogged. After fixing the background match, reject whole chunks beyond fog using bounds and the same distance metric.
+
+6. **Sky unnecessarily shades terrain-covered pixels** — [skybox.cpp:9](/mnt/data/projects/Personal/vecEngine/src/skybox.cpp:9), [skybox.vert:11](/mnt/data/projects/Personal/vecEngine/shaders/skybox.vert:11). Drawing sky first runs procedural clouds before opaque geometry overwrites them. **Fix:** draw after opaque geometry, before transparency; output `clip.xyww`, use `GL_LEQUAL`, disable depth writes, then restore state.
+
+7. **Culling gaps waste vegetation and fleet work** — [grass.cpp:195](/mnt/data/projects/Personal/vecEngine/src/grass.cpp:195), [shrubs.cpp:212](/mnt/data/projects/Personal/vecEngine/src/shrubs.cpp:212), [blackbox_main.cpp:226](/mnt/data/projects/Personal/vecEngine/apps/blackbox_main.cpp:226). Entire vegetation disks are submitted; six aircraft always issue 30 draws. **Fix:** sphere-cull aircraft before `draw`; reject invisible vegetation instances in the vertex shader before wind/shadow calculations, conservatively accounting for their size.
+
+8. **Shadow stabilization snaps in the wrong coordinates** — [shadow_map.cpp:67](/mnt/data/projects/Personal/vecEngine/src/shadow_map.cpp:67). World-XZ increments are fractional texel movements after the angled light rotation, allowing shadow crawl. **Fix:** snap the orthographic projection’s light-space XY translation to texel increments.
+
+9. **Manual PCF filters depths before comparing** — [shadow_map.cpp:29](/mnt/data/projects/Personal/vecEngine/src/shadow_map.cpp:29), [basic.frag:65](/mnt/data/projects/Personal/vecEngine/shaders/basic.frag:65). `GL_LINEAR` interpolates unrelated depths at silhouettes; thresholding that interpolation distorts shadow edges. **Fix:** use `GL_NEAREST` with the existing nine comparisons.
+
+10. **Plane has no material distinction or shared lighting** — [plane.frag:7](/mnt/data/projects/Personal/vecEngine/shaders/plane.frag:7), [plane_model.cpp:45](/mnt/data/projects/Personal/vecEngine/src/plane_model.cpp:45). Cockpit, fuselage and propeller are identically gray boxes; hardcoded lighting ignores the world’s sun color/ambient. **Fix:** add simple per-part colors, especially a dark canopy, and pass existing sun uniforms.
+
+11. **Terrain detail aliases during flight** — [basic.frag:80](/mnt/data/projects/Personal/vecEngine/shaders/basic.frag:80). Unfiltered 0.7/3.1-frequency procedural noise becomes subpixel grain, producing shimmer while retaining eight sine hashes per fragment. **Fix:** attenuate each octave using screen-space derivatives as its wavelength becomes subpixel.
+
+12. **Water composites before opaque objects** — [main.cpp:373](/mnt/data/projects/Personal/vecEngine/main.cpp:373). Water disables depth writes, then missiles, balloons, rings and the plane render afterward; submerged geometry can overwrite water without its tint. **Fix:** draw all opaque objects first, then blended water with depth writes disabled.

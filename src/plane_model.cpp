@@ -1,4 +1,5 @@
 #include "game/plane_model.h"
+#include "renderer/obj_loader.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -47,14 +48,19 @@ Mesh buildBodyMesh() {
 	std::vector<unsigned int> i;
 	// Fuselage — main body. Nose at -Z (front), tail at +Z.
 	appendBox(v, i, {0.0f,  0.00f,  0.00f}, {0.45f, 0.45f, 2.6f});
-	// Cockpit bump on top.
-	appendBox(v, i, {0.0f,  0.55f, -0.60f}, {0.35f, 0.30f, 0.65f});
 	// Wings — wide and thin.
 	appendBox(v, i, {0.0f,  0.00f,  0.00f}, {2.8f,  0.09f, 0.85f});
 	// Horizontal stabilizer (without elevator — that's a separate animated part).
 	appendBox(v, i, {0.0f,  0.15f,  2.00f}, {1.05f, 0.07f, 0.30f});
 	// Vertical fin / rudder.
 	appendBox(v, i, {0.0f,  0.55f,  2.00f}, {0.06f, 0.55f, 0.45f});
+	return Mesh(v, i);
+}
+
+Mesh buildCanopyMesh() {
+	std::vector<Vertex> v;
+	std::vector<unsigned int> i;
+	appendBox(v, i, {0.0f, 0.55f, -0.60f}, {0.35f, 0.30f, 0.65f});
 	return Mesh(v, i);
 }
 
@@ -100,12 +106,24 @@ glm::mat4 orientPlane(const glm::vec3& position, float yawDeg, float pitchDeg, f
 
 }  // namespace
 
-PlaneModel::PlaneModel()
+PlaneModel::PlaneModel(const std::string& objPath, float yawDeg)
 	: bodyMesh(buildBodyMesh()),
+	  canopyMesh(buildCanopyMesh()),
 	  propellerMesh(buildPropellerMesh()),
 	  aileronMesh(buildAileronMesh()),
 	  elevatorMesh(buildElevatorMesh()),
-	  shader("shaders/plane.vert", "shaders/plane.frag") {}
+	  shader("shaders/plane.vert", "shaders/plane.frag") {
+	if (!objPath.empty()) {
+		Mesh loaded = loadObj(objPath, /*targetWidth=*/5.6f, yawDeg);  // same wingspan as the box plane
+		if (loaded.indexCount > 0) { bodyMesh = std::move(loaded); customModel = true; }
+	}
+}
+
+void PlaneModel::drawDepth(const Shader& depthShader, const glm::vec3& position,
+                           float yawDeg, float pitchDeg, float rollDeg) const {
+	depthShader.setMat4("model", orientPlane(position, yawDeg, pitchDeg, rollDeg));
+	bodyMesh.draw();
+}
 
 void PlaneModel::draw(const glm::mat4& view, const glm::mat4& projection,
                       const glm::vec3& position,
@@ -123,6 +141,12 @@ void PlaneModel::draw(const glm::mat4& view, const glm::mat4& projection,
 	// Body — static under the plane's orientation.
 	shader.setMat4("model", planeM);
 	bodyMesh.draw();
+	if (customModel) return;  // a loaded model is one piece, no animated parts
+
+	// Canopy: dark tinted glass, then back to the body tint for the moving parts.
+	shader.setVec3("tint", tint * glm::vec3(0.18f, 0.22f, 0.28f));
+	canopyMesh.draw();
+	shader.setVec3("tint", tint);
 
 	// Propeller — at the nose (-Z 2.7 in plane local), spinning around the
 	// plane's forward axis (Z in mesh local). Spin rate scales with throttle.

@@ -49,6 +49,7 @@ add_executable(flight
     src/light.cpp
     src/mesh.cpp
     src/missile.cpp
+    src/obj_loader.cpp
     src/overlay.cpp
     src/plane_model.cpp
     src/rain.cpp
@@ -92,6 +93,7 @@ add_executable(blackbox
     src/input.cpp
     src/light.cpp
     src/mesh.cpp
+    src/obj_loader.cpp
     src/overlay.cpp
     src/plane_model.cpp
     src/shader.cpp
@@ -119,6 +121,7 @@ add_executable(flight_tests
     tests/test_main.cpp
     src/camera.cpp
     src/holds.cpp
+    src/obj_loader.cpp
     src/frustum.cpp
     src/mesh.cpp
     src/shader.cpp

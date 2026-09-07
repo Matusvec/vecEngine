@@ -72,6 +72,8 @@ float sampleShadow(vec4 lightSpacePos, vec3 normal, vec3 lightDir) {
 }
 
 void main() {
+    float fogFactor = clamp((FOG_END - FogDistance) / (FOG_END - FOG_START), 0.0, 1.0);
+    if (fogFactor <= 0.0) { FragColor = vec4(FOG_COLOR, 1.0); return; }  // fully fogged: skip noise, lighting, shadow taps
     vec3 norm = normalize(Normal);
     vec3 grassTex = texture(textureSampler, TexCoords).rgb;
 
@@ -112,7 +114,6 @@ void main() {
     float shadow = sampleShadow(LightSpacePos, norm, lightDir);
     vec3 lit = ambient + (1.0 - shadow) * (diffuse + specular);
 
-    float fogFactor = clamp((FOG_END - FogDistance) / (FOG_END - FOG_START), 0.0, 1.0);
     vec3 finalColor = mix(FOG_COLOR, lit, fogFactor);
     FragColor = vec4(finalColor, 1.0);
 }
