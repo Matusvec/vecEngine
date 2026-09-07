@@ -1,3 +1,0 @@
-/home/mvecera/Projects/vecEngine/build/CMakeFiles/flight.dir
-/home/mvecera/Projects/vecEngine/build/CMakeFiles/edit_cache.dir
-/home/mvecera/Projects/vecEngine/build/CMakeFiles/rebuild_cache.dir

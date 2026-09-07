@@ -1,1 +1,0 @@
-/usr/bin/c++ -Wl,--dependency-file=CMakeFiles/flight.dir/link.d CMakeFiles/flight.dir/main.cpp.o CMakeFiles/flight.dir/vendor/src/glad.c.o -o flight  /usr/lib/libglfw.so.3.4 /usr/lib/libglm.a /usr/lib/libGLX.so /usr/lib/libOpenGL.so
