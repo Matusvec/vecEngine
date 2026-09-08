@@ -238,7 +238,7 @@ int main() {
 			}
 			if (now - lastTitle > 0.25) {
 				std::string title = "BLACKBOX " + tail + (parked ? "  [ON RAMP, SPACE to take off]" : "  [AIRBORNE]");
-				if (held) title += "  *** HELD BY MAINTENANCE, grounded ***";
+				if (held) title += parked ? "  *** HELD BY MAINTENANCE, grounded ***" : "  *** HELD BY MAINTENANCE, return to ramp (R) ***";
 				if (actuatorFailing) title += "  *** AILERON ACTUATOR FAILING, F to heal ***";
 				title += "  spd " + std::to_string((int)controller.speed()) + "  thr " + std::to_string((int)(controller.throttle * 100)) + "%";
 				glfwSetWindowTitle(window, title.c_str());
@@ -298,7 +298,10 @@ int main() {
 				}
 			}
 
-			if (parked) overlay.drawTinted(held ? glm::vec3{0.55f, 0.04f, 0.04f} : glm::vec3{0.0f, 0.06f, 0.16f}, 0.25f);
+			// Parked: blue wash, or red when held. Airborne and held: a lighter red wash, so a hold issued
+			// mid-flight is visible on screen, not just in the window title.
+			if (held) overlay.drawTinted(glm::vec3{0.55f, 0.04f, 0.04f}, parked ? 0.25f : 0.12f);
+			else if (parked) overlay.drawTinted(glm::vec3{0.0f, 0.06f, 0.16f}, 0.25f);
 
 			glfwSwapBuffers(window);
 			glfwPollEvents();
