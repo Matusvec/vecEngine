@@ -27,3 +27,35 @@ Ranked by likely impact; source review only, no frame-time measurements.
 11. **Terrain detail aliases during flight** — [basic.frag:80](/mnt/data/projects/Personal/vecEngine/shaders/basic.frag:80). Unfiltered 0.7/3.1-frequency procedural noise becomes subpixel grain, producing shimmer while retaining eight sine hashes per fragment. **Fix:** attenuate each octave using screen-space derivatives as its wavelength becomes subpixel.
 
 12. **Water composites before opaque objects** — [main.cpp:373](/mnt/data/projects/Personal/vecEngine/main.cpp:373). Water disables depth writes, then missiles, balloons, rings and the plane render afterward; submerged geometry can overwrite water without its tint. **Fix:** draw all opaque objects first, then blended water with depth writes disabled.
+## Aerodynamics (post-BLACKBOX, top priority for the engine)
+
+Replace the arcade `FlightController::step()` with a rigid-body flight model. Keep the same public
+state (position, yaw/pitch/roll, throttle, aileron lag) so apps and telemetry do not change.
+
+**Model**
+- Rigid body: mass, inertia tensor, centre of gravity. Forces and moments integrate with semi-implicit Euler.
+- Aircraft is a list of *surfaces* (wing panels, stabilisers, fin, fuselage drag body), each with area,
+  position relative to CG, span direction, incidence, and a Cl(alpha)/Cd(alpha) curve. Flat-plate with a
+  stall break is enough to start; per-surface curves can be swapped for real airfoil data later.
+- Per surface each step: local airflow = -(velocity + omega x r), dynamic pressure q = 0.5 * rho * V^2,
+  alpha from the local flow, L = q * S * Cl(alpha), D = q * S * Cd(alpha), applied at the surface position
+  so they produce pitching, rolling and yawing moments. This *is* the integral of the pressure difference
+  over the wing; the coefficient curves encode it. Actual pressure-field integration (panel methods, CFD)
+  is offline territory, not a 60 Hz loop.
+- Control surfaces deflect a panel's incidence (aileron left/right differential, elevator, rudder).
+  Aileron keeps the first-order actuator lag so BLACKBOX telemetry is unchanged.
+- Air density from altitude (ISA table), so ceiling and thin air fall out for free.
+- Thrust from throttle along the body axis, propeller efficiency dropping with speed.
+- Ground: gear contact points with spring/damper and rolling friction; replaces today's groundY hack.
+
+**Wind tunnel app** (`apps/windtunnel_main.cpp`)
+- Loads an aircraft definition (JSON: mass, surfaces, curves, gear) and sweeps alpha, sideslip, speed.
+- Prints/plots Cl, Cd, L/D, pitching moment vs alpha, trim point, stall angle, and per-surface force
+  arrows on the model. Headless mode dumps a CSV so it runs in tests.
+- Same JSON drives the sim, so someone can change a wing, run the tunnel, then fly it.
+
+**Tests**: level-flight trim converges; stall angle matches the curve; Cl scales with rho and V^2;
+glide ratio ≈ L/D; ground roll stops at idle.
+
+**Order**: 1) rigid body + one wing + tail, trim and fly. 2) JSON aircraft definition. 3) wind tunnel
+sweep, headless. 4) ground gear model. 5) tunnel viewer with force arrows.
