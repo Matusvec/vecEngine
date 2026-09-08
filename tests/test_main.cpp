@@ -10,6 +10,7 @@
 #include "world/terrain.h"
 #include "blackbox/holds.h"
 #include "renderer/obj_loader.h"
+#include "game/flight_controller.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -164,6 +165,62 @@ void test_obj_parser() {
 	check(!parseObj("/tmp/does_not_exist.obj", 1.0f, 0.0f, v, idx), "missing file returns false");
 }
 
+// ---------------------------------------------------------------------------
+// FlightController ground model (the BLACKBOX app's flat airfield settings)
+// ---------------------------------------------------------------------------
+FlightController groundedPlane(Camera& cam, float groundY) {
+	FlightController c(cam, {0.0f, groundY, 0.0f});
+	c.mouseTrim = false;
+	c.minSpeed = 0.0f; c.maxSpeed = 150.0f; c.speedSmoothing = 0.5f; c.gravityGain = 120.0f;
+	c.maxPitch = 25.0f; c.maxRoll = 60.0f; c.stallSpeed = 40.0f;
+	c.groundY = groundY;
+	c.velocity = glm::vec3(0.0f);
+	c.throttle = 0.0f;
+	return c;
+}
+
+void test_ground_model() {
+	std::printf("[ground model]\n");
+	const float G = 31.2f;
+	Camera cam({0.0f, G, 0.0f}, {0.0f, 1.0f, 0.0f}, -90.0f, 0.0f);
+
+	// Idle on the ground with speed: rolls to a stop, never leaves the surface.
+	{
+		FlightController c = groundedPlane(cam, G);
+		c.velocity = c.forward() * 30.0f;
+		for (int i = 0; i < 600; ++i) c.step(1.0f / 60.0f, {});
+		check(c.speed() < 0.01f, "idle on the ground rolls to a full stop within 10 s");
+		check(c.onGround() && nearly(c.position.y, G, 1e-3f), "stays on the surface while rolling");
+	}
+	{
+		// Full throttle from rest: rotates by itself and gets airborne.
+		FlightController c = groundedPlane(cam, G);
+		c.throttle = 0.8f;
+		for (int i = 0; i < 600; ++i) c.step(1.0f / 60.0f, {});
+		check(!c.onGround() && c.position.y > G + 5.0f, "throttle up from rest takes off within 10 s");
+	}
+	{
+	// Banking hard just above the ground: the wingtip never goes below the surface.
+	FlightController c = groundedPlane(cam, G);
+	c.position.y = G + 0.5f; c.throttle = 0.8f; c.velocity = c.forward() * 100.0f;
+	FlightInput bank; bank.rollAxis = 1.0f; bank.pitchAxis = -1.0f;  // roll right, push nose down
+	float minTip = 1e9f;
+	for (int i = 0; i < 300; ++i) {
+		c.step(1.0f / 60.0f, bank);
+		float tip = c.position.y - c.halfSpan * std::fabs(std::sin(glm::radians(c.roll)));
+		minTip = std::min(minTip, tip);
+	}
+	check(minTip >= G - c.gearHeight - 1e-3f, "wingtip stays above the surface while banking low");
+	}
+	{
+		// Airborne at idle: speed decays below stall and the nose drops (no invisible speed floor).
+		FlightController c = groundedPlane(cam, G);
+		c.position.y = G + 500.0f; c.velocity = c.forward() * 100.0f;
+		for (int i = 0; i < 900; ++i) c.step(1.0f / 60.0f, {});
+		check(c.speed() < 100.0f && c.pitch < 0.0f, "idle in the air bleeds speed and the nose drops");
+	}
+}
+
 int main() {
 	std::printf("Running vecEngine unit tests...\n\n");
 
@@ -173,6 +230,7 @@ int main() {
 	test_camera_basis_vectors();
 	test_holds_parsing();
 	test_obj_parser();
+	test_ground_model();
 
 	std::printf("\n%d/%d checks passed\n", totalChecks - failedChecks, totalChecks);
 	return failedChecks == 0 ? 0 : 1;

@@ -1,9 +1,18 @@
 #pragma once
-
 #include <glm/glm.hpp>
 
 class Camera;
 class Input;
+
+// One frame of pilot input, already decoded from whatever device produced it.
+// Keeps the physics step free of GLFW so any app (or a test) can drive it.
+struct FlightInput {
+	float throttleAxis = 0.0f;  // -1 (S) .. +1 (W); +2 with shift burn
+	float pitchAxis = 0.0f;     // +1 = pull (nose up), -1 = push (nose down)
+	float rollAxis = 0.0f;      // -1 left .. +1 right
+	float mouseDX = 0.0f, mouseDY = 0.0f;
+	int throttlePreset = -1;    // 0..8 from the number row, -1 = none
+};
 
 // Arcade-style flight model:
 //   throttle (W/S) → target speed
@@ -12,16 +21,25 @@ class Input;
 //   no input → roll smooths back toward 0 (auto-level)
 // State persists frame to frame (real momentum), so the plane keeps moving when
 // you take your hands off the controls.
+//
+// Ground: apps with a landable surface set groundY (the altitude `position.y` rests at
+// on the wheels). On the ground the plane rolls with friction, cannot bank, steers with
+// the roll keys, and rotates by itself once past rotateSpeed. Near the ground the bank
+// angle is capped so a wingtip never goes below the surface. Default groundY is far
+// below everything, which is the old behaviour.
 class FlightController {
 public:
 	FlightController(Camera& camera, const glm::vec3& startPos);
 
-	// Advances physics one step. If the plane is frozen (game over), no-op.
+	// Reads GLFW keys/mouse and advances one step. Defined in flight_input.cpp.
 	void update(float dt, const Input& input);
+	// Advances physics one step from decoded input. If frozen, no-op.
+	void step(float dt, const FlightInput& in);
 
 	void freeze()   { frozen = true; }
 	void unfreeze() { frozen = false; }
 	bool isFrozen() const { return frozen; }
+	bool onGround() const { return position.y <= groundY + 0.05f; }
 
 	// Reset position + orientation + velocity to a fresh spawn state. Used
 	// by the R-key restart handler. Does NOT toggle frozen; caller decides.
@@ -54,7 +72,7 @@ public:
 	float aileronTau = 0.05f;
 
 	// Tunables — exposed so we can tweak feel from main if needed.
-	float minSpeed = 25.0f;
+	float minSpeed = 25.0f;        // airborne speed floor; set 0 for a plane that can stall at idle
 	float maxSpeed = 240.0f;
 	float speedSmoothing = 1.6f;   // higher = snappier throttle response
 	float pitchRate = 55.0f;       // deg/sec while pitching
@@ -65,14 +83,23 @@ public:
 	float yawFromRoll = 1.1f;      // larger = sharper banked turns
 	float stallSpeed = 30.0f;
 	float gravity = 18.0f;
+	float gravityGain = 0.0f;      // m/s of target speed gained per unit of sin(dive); 0 = old model
 	bool mouseTrim = true;         // BLACKBOX turns this off, the sim flies on keys only
+
+	// Ground model (see class comment).
+	float groundY = -1.0e9f;       // resting altitude of `position` on the wheels
+	float gearHeight = 1.2f;       // position.y minus the surface when resting
+	float halfSpan = 2.8f;         // wingtip reach from the centreline
+	float rotateSpeed = 40.0f;     // ground speed at which the nose comes up by itself
+	float rotatePitch = 8.0f;
+	float groundFriction = 0.6f;   // per-second speed decay when rolling at idle
+	float groundSteerRate = 45.0f; // deg/sec of yaw from the roll keys on the ground
 
 	float speed() const;
 	glm::vec3 forward() const;
 
 private:
 	void syncCamera();
-
 	Camera& camera;
 	bool frozen = false;
 	bool thirdPerson = false;

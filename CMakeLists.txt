@@ -41,6 +41,7 @@ add_executable(flight
     src/balloon.cpp
     src/camera.cpp
     src/flight_controller.cpp
+    src/flight_input.cpp
     src/frustum.cpp
     src/game.cpp
     src/grass.cpp
@@ -87,6 +88,7 @@ add_executable(blackbox
     apps/blackbox_main.cpp
     src/camera.cpp
     src/flight_controller.cpp
+    src/flight_input.cpp
     src/frustum.cpp
     src/grass.cpp
     src/holds.cpp
@@ -120,6 +122,7 @@ endif()
 add_executable(flight_tests
     tests/test_main.cpp
     src/camera.cpp
+    src/flight_controller.cpp
     src/holds.cpp
     src/obj_loader.cpp
     src/frustum.cpp

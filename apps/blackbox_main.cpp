@@ -4,7 +4,8 @@
 //   SPACE  take off (refused while this tail is held)     F  toggle aileron actuator failure
 //   C      fleet overview camera                          R  back to the ramp
 //   Mouse  orbit the camera around the aircraft (eases back behind it when idle)
-//   W/S throttle, Up/Down pitch, Left/Right bank, ESC quit
+//   W/S throttle (1..9 presets, 1 = idle), Up/Down pitch, Left/Right bank (steer on the ground), ESC quit
+//   Land: line up, idle, let it settle; once stopped at idle it is parked again and SPACE takes off from there.
 //
 // Env: BLACKBOX_TAIL (N101), BLACKBOX_UDP_PORT (5005), BLACKBOX_HOLDS (../../palantir/bridge/holds.json),
 //      BLACKBOX_FAILING_TAU (0.6)
@@ -115,7 +116,9 @@ int main() {
 		controller.throttle = 0.0f;  // engine off on the ramp
 		// Calmer trainer-like handling than the arcade game. Units are metres and seconds.
 		// ponytail: tuned by feel, not aero; add lift/drag if the video needs real energy management
-		controller.minSpeed = 45.0f;        // stall-ish floor
+		controller.minSpeed = 0.0f;         // idle in the air means you stall, like a real trainer
+		controller.gravityGain = 120.0f;    // a 30 deg dive adds ~60 m/s of target speed, a climb bleeds it
+		controller.groundY = GROUND + 1.2f; // wheels on the flat world; landings, ground roll, no wings in the dirt
 		controller.maxSpeed = 150.0f;       // ~290 kt
 		controller.speedSmoothing = 0.5f;   // throttle takes a couple of seconds to bite
 		controller.pitchRate = 20.0f;       // deg/s
@@ -163,7 +166,7 @@ int main() {
 		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);  // mouse orbits the camera, never leaves the window
 		float orbitYaw = 0.0f, orbitPitch = 0.0f;  // mouse offsets from the default chase view, drift back when idle
 		bool parked = true, actuatorFailing = false, overview = false;
-		bool wasSpace = false, wasFail = false, wasCam = false, wasReset = false;
+		bool wasSpace = false, wasFail = false, wasCam = false, wasReset = false, wasHeld = false;
 		float lastFrame = 0.0f;
 		double lastTelemetry = 0.0, lastTitle = 0.0;
 
@@ -182,12 +185,24 @@ int main() {
 					std::cerr << "BLACKBOX: " << tail << " is HELD by maintenance, take-off refused\n";
 				} else {
 					parked = false;
-					controller.pitch = 8.0f;    // rotate and climb; the pilot takes it from here
-					controller.throttle = 0.6f;
+					controller.throttle = 0.8f;  // full-ish power; the ground model rotates the nose once fast enough
 					controller.unfreeze();
-					std::cerr << "BLACKBOX: " << tail << " airborne\n";
+					std::cerr << "BLACKBOX: " << tail << " rolling\n";
 				}
 			}
+			// Landed and stopped with the engine at idle: back to parked, SPACE takes off again from here.
+			if (!parked && controller.onGround() && controller.speed() < 0.5f && controller.throttle < 0.05f) {
+				parked = true;
+				controller.freeze();
+				std::cerr << "BLACKBOX: " << tail << " stopped\n";
+			}
+			// Maintenance released the hold: the actuator was replaced, so the failure clears with it.
+			if (wasHeld && !held && actuatorFailing) {
+				actuatorFailing = false;
+				controller.aileronTau = healthyTau;
+				std::cerr << "BLACKBOX: " << tail << " released, actuator healthy\n";
+			}
+			wasHeld = held;
 			if (pressedEdge(input, GLFW_KEY_R, wasReset)) {
 				parked = true;
 				controller.reset(rampSlot(flownIndex));
@@ -203,10 +218,6 @@ int main() {
 			if (pressedEdge(input, GLFW_KEY_C, wasCam)) overview = !overview;
 
 			controller.update(dt, input);
-			if (!parked && controller.position.y < GROUND + 1.2f) {  // flat world: never go below the ramp
-				controller.position.y = GROUND + 1.2f;
-				if (controller.pitch < 0.0f) controller.pitch = 0.0f;
-			}
 			// Third-person orbit camera: mouse swings it around the aircraft, and it eases back behind when idle.
 			orbitYaw += input.mouseDeltaX() * 0.12f;
 			orbitPitch = std::clamp(orbitPitch - input.mouseDeltaY() * 0.12f, -50.0f, 60.0f);
@@ -237,7 +248,7 @@ int main() {
 				lastTelemetry = now;
 			}
 			if (now - lastTitle > 0.25) {
-				std::string title = "BLACKBOX " + tail + (parked ? "  [ON RAMP, SPACE to take off]" : "  [AIRBORNE]");
+				std::string title = "BLACKBOX " + tail + (parked ? "  [ON RAMP, SPACE to take off]" : controller.onGround() ? "  [ROLLING, idle to stop]" : "  [AIRBORNE]");
 				if (held) title += parked ? "  *** HELD BY MAINTENANCE, grounded ***" : "  *** HELD BY MAINTENANCE, return to ramp (R) ***";
 				if (actuatorFailing) title += "  *** AILERON ACTUATOR FAILING, F to heal ***";
 				title += "  spd " + std::to_string((int)controller.speed()) + "  thr " + std::to_string((int)(controller.throttle * 100)) + "%";
