@@ -3,7 +3,7 @@
 //
 //   SPACE  take off (refused while this tail is held)     F  toggle aileron actuator failure
 //   C      fleet overview camera                          R  back to the ramp
-//   Mouse  orbit the camera around the aircraft (eases back behind it when idle)
+//   Mouse  orbit the camera around the aircraft (stays put)   V / right-click  snap the camera back behind
 //   W/S throttle (1..9 presets, 1 = idle), Up/Down pitch, Left/Right bank (steer on the ground), ESC quit
 //   Land: line up, idle, let it settle; once stopped at idle it is parked again and SPACE takes off from there.
 //
@@ -164,9 +164,9 @@ int main() {
 		Grass grass(-10.0f, 240.0f, 2.0f);
 
 		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);  // mouse orbits the camera, never leaves the window
-		float orbitYaw = 0.0f, orbitPitch = 0.0f;  // mouse offsets from the default chase view, drift back when idle
+		float orbitYaw = 0.0f, orbitPitch = 0.0f;  // mouse offsets from the chase view; they stay put, V or right-click recentres
 		bool parked = true, actuatorFailing = false, overview = false;
-		bool wasSpace = false, wasFail = false, wasCam = false, wasReset = false, wasHeld = false;
+		bool wasSpace = false, wasFail = false, wasCam = false, wasReset = false, wasHeld = false, wasView = false;
 		float lastFrame = 0.0f;
 		double lastTelemetry = 0.0, lastTitle = 0.0;
 
@@ -221,8 +221,13 @@ int main() {
 			// Third-person orbit camera: mouse swings it around the aircraft, and it eases back behind when idle.
 			orbitYaw += input.mouseDeltaX() * 0.12f;
 			orbitPitch = std::clamp(orbitPitch - input.mouseDeltaY() * 0.12f, -50.0f, 60.0f);
-			orbitYaw -= orbitYaw * std::min(1.0f, dt * 0.6f);
-			orbitPitch -= orbitPitch * std::min(1.0f, dt * 0.6f);
+			if (orbitYaw > 180.0f) orbitYaw -= 360.0f;   // keep the offset short so a full spin does not wind up
+			if (orbitYaw < -180.0f) orbitYaw += 360.0f;
+			// No spring: the view stays where the mouse left it. V or the right mouse button snaps it back behind.
+			if (pressedEdge(input, GLFW_KEY_V, wasView) || glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
+				orbitYaw = 0.0f;
+				orbitPitch = 0.0f;
+			}
 			{
 				float camYaw = controller.yaw + orbitYaw;
 				float camPitch = std::clamp(controller.pitch * 0.4f - 10.0f + orbitPitch, -80.0f, 80.0f);
