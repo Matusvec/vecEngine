@@ -119,6 +119,7 @@ int main() {
 		controller.minSpeed = 0.0f;         // idle in the air means you stall, like a real trainer
 		controller.gravityGain = 120.0f;    // a 30 deg dive adds ~60 m/s of target speed, a climb bleeds it
 		controller.groundY = GROUND + 1.2f; // wheels on the flat world; landings, ground roll, no wings in the dirt
+		controller.velocity = glm::vec3(0.0f);  // the constructor seeds arcade-game speed; on the ramp we start still
 		controller.maxSpeed = 150.0f;       // ~290 kt
 		controller.speedSmoothing = 0.5f;   // throttle takes a couple of seconds to bite
 		controller.pitchRate = 20.0f;       // deg/s
