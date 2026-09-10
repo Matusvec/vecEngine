@@ -58,6 +58,7 @@ bool pressedEdge(const Input& input, int key, bool& was) {
 constexpr float GROUND = 30.0f;                 // flat world height, grass band in basic.frag
 const std::vector<std::string> FLEET = {"N101", "N102", "N103", "N104", "N105", "N106"};
 glm::vec3 rampSlot(int i) { return {-75.0f + 30.0f * i, GROUND + 1.2f, 0.0f}; }  // a line of six, 30 m apart
+const glm::vec3 RUNWAY_START{0.0f, GROUND + 1.2f, -95.0f};  // the flown aircraft starts lined up at the threshold
 const glm::vec3 HELD_TINT{1.0f, 0.25f, 0.25f};
 
 // Flat rectangle in the XZ plane, normal up, world-space UVs so the ground texture tiles.
@@ -106,10 +107,10 @@ int main() {
 	{
 		Shader shader("shaders/basic.vert", "shaders/basic.frag");
 		Shader depthShader("shaders/shadow_depth.vert", "shaders/shadow_depth.frag");
-		Camera camera(rampSlot(flownIndex), {0.0f, 1.0f, 0.0f}, -90.0f, 0.0f);
+		Camera camera(RUNWAY_START, {0.0f, 1.0f, 0.0f}, -90.0f, 0.0f);
 		camera.farPlane = 3000.0f;  // the ground plane reaches the horizon, fog does the rest
 		Input input(window);
-		FlightController controller(camera, rampSlot(flownIndex));
+		FlightController controller(camera, RUNWAY_START);
 		controller.mouseTrim = false;
 		controller.toggleView();  // third person from the start
 		controller.freeze();      // parked
@@ -213,7 +214,7 @@ int main() {
 			wasHeld = held;
 			if (pressedEdge(input, GLFW_KEY_R, wasReset)) {
 				parked = true;
-				controller.reset(rampSlot(flownIndex));
+				controller.reset(RUNWAY_START);
 				controller.freeze();
 				controller.throttle = 0.0f;
 			}
