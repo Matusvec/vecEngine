@@ -192,8 +192,7 @@ int main() {
 					std::cerr << "BLACKBOX: " << tail << " is HELD by maintenance, take-off refused\n";
 				} else {
 					parked = false;
-					// Just enough power to fly: ~40% above stall speed, so the take-off is slow and the pilot adds power.
-					controller.throttle = std::min(1.0f, controller.stallSpeed * 1.4f / controller.maxSpeed);
+					controller.throttle = 0.15f;  // barely rolling; the pilot adds power with W and rotates past rotateSpeed
 					controller.unfreeze();
 					std::cerr << "BLACKBOX: " << tail << " rolling\n";
 				}
