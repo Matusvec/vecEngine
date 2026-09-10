@@ -138,12 +138,20 @@ int main() {
 		PlaneModel planeModel(envOr("BLACKBOX_MODEL", ""), std::stof(envOr("BLACKBOX_MODEL_YAW", "90")), envOr("BLACKBOX_PROP", ""));
 		Shader markingShader("shaders/plane.vert", "shaders/plane.frag");  // untextured, tinted, fogged: fine for tarmac
 		Mesh farGround = makeQuad({0.0f, GROUND - 0.3f, 0.0f}, 3000.0f, 3000.0f);
-		// Grass airfield with one paved runway ahead of the ramp (aircraft face -Z), centreline dashes and edge lines.
-		Mesh runway = makeQuad({0.0f, GROUND + 0.05f, -680.0f}, 22.0f, 650.0f);
+		Grass grass(-10.0f, 240.0f, 2.0f);
+		// Grass airfield: a paved apron under the ramp, a short taxiway, and a 1.4 km runway ahead
+		// (aircraft face -Z). Centreline dashes and edge lines on the runway. Grass stays off the tarmac.
+		constexpr float RW_HALF_W = 22.0f, RW_Z0 = -80.0f, RW_Z1 = -1520.0f, RW_MID = (RW_Z0 + RW_Z1) * 0.5f, RW_HALF_L = (RW_Z0 - RW_Z1) * 0.5f;
+		Mesh runway = makeQuad({0.0f, GROUND + 0.05f, RW_MID}, RW_HALF_W, RW_HALF_L);
+		Mesh apron = makeQuad({0.0f, GROUND + 0.05f, 0.0f}, 130.0f, 35.0f);
+		Mesh taxiway = makeQuad({0.0f, GROUND + 0.05f, -57.0f}, 12.0f, 25.0f);
+		grass.addPaved(-RW_HALF_W - 2.0f, RW_Z1 - 3.0f, RW_HALF_W + 2.0f, RW_Z0 + 3.0f);
+		grass.addPaved(-132.0f, -37.0f, 132.0f, 37.0f);
+		grass.addPaved(-14.0f, -84.0f, 14.0f, -30.0f);
 		std::vector<Mesh> markings;
-		for (float z = -60.0f; z > -1300.0f; z -= 40.0f) markings.push_back(makeQuad({0.0f, GROUND + 0.10f, z}, 0.6f, 9.0f));
-		markings.push_back(makeQuad({-21.0f, GROUND + 0.10f, -680.0f}, 0.5f, 650.0f));
-		markings.push_back(makeQuad({ 21.0f, GROUND + 0.10f, -680.0f}, 0.5f, 650.0f));
+		for (float z = RW_Z0 - 20.0f; z > RW_Z1 + 20.0f; z -= 40.0f) markings.push_back(makeQuad({0.0f, GROUND + 0.10f, z}, 0.6f, 9.0f));
+		markings.push_back(makeQuad({-RW_HALF_W + 1.0f, GROUND + 0.10f, RW_MID}, 0.5f, RW_HALF_L));
+		markings.push_back(makeQuad({ RW_HALF_W - 1.0f, GROUND + 0.10f, RW_MID}, 0.5f, RW_HALF_L));
 		Telemetry telemetry("127.0.0.1", std::stoi(envOr("BLACKBOX_UDP_PORT", "5005")));
 		Holds holds(envOr("BLACKBOX_HOLDS", "../../palantir/bridge/holds.json"));
 
@@ -161,7 +169,6 @@ int main() {
 		shader.use();
 		shader.setInt("textureSampler", 0);
 		Terrain terrain(14, 16, 32.0f);
-		Grass grass(-10.0f, 240.0f, 2.0f);
 
 		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);  // mouse orbits the camera, never leaves the window
 		float orbitYaw = 0.0f, orbitPitch = 0.0f;  // mouse offsets from the chase view; they stay put, V or right-click recentres
@@ -296,6 +303,9 @@ int main() {
 			markingShader.setMat4("model", glm::mat4(1.0f));
 			markingShader.setVec3("tint", {0.30f, 0.30f, 0.32f});
 			runway.draw();
+			markingShader.setVec3("tint", {0.34f, 0.34f, 0.35f});
+			apron.draw();
+			taxiway.draw();
 			markingShader.setVec3("tint", {1.2f, 1.2f, 1.1f});
 			for (const Mesh& m : markings) m.draw();
 

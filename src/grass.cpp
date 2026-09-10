@@ -133,6 +133,10 @@ void Grass::regenerate(const glm::vec3& cameraPos) {
 			// Patchy distribution so meadows have visible edges — bald ground in
 			// between rather than uniform grass everywhere.
 			if (patchMask(x, z) < PATCH_THRESHOLD) continue;
+			bool onPavement = false;
+			for (const glm::vec4& r : paved)
+				if (x >= r.x && z >= r.y && x <= r.z && z <= r.w) { onPavement = true; break; }
+			if (onPavement) continue;
 
 			Blade b;
 			b.position = glm::vec3(x, y, z);

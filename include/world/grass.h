@@ -41,8 +41,13 @@ public:
 		glm::vec3 randoms;  // (rotationRadians, heightScale, tintMultiplier)
 	};
 
+	// Axis-aligned rectangles (minX, minZ, maxX, maxZ) that get no blades: runways, aprons, roads.
+	// Set before the first update(); call regenerate through update() after changing them.
+	void addPaved(float minX, float minZ, float maxX, float maxZ) { paved.push_back({minX, minZ, maxX, maxZ}); }
+
 private:
 	void regenerate(const glm::vec3& cameraPos);
+	std::vector<glm::vec4> paved;
 
 	Shader shader;
 	unsigned int VAO = 0;
