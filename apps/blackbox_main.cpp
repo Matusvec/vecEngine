@@ -192,7 +192,7 @@ int main() {
 					std::cerr << "BLACKBOX: " << tail << " is HELD by maintenance, take-off refused\n";
 				} else {
 					parked = false;
-					controller.throttle = 0.15f;  // barely rolling; the pilot adds power with W and rotates past rotateSpeed
+					controller.throttle = 0.05f;  // idle creep, a few m/s; the pilot adds power with W and rotates past rotateSpeed
 					controller.unfreeze();
 					std::cerr << "BLACKBOX: " << tail << " rolling\n";
 				}
