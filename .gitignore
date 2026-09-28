@@ -23,6 +23,9 @@ compile_commands.json
 *~
 
 # Debug
-core
-core.*
+/core
+/core.*
 *.dSYM/
+
+# Aircraft models are real assets, not build output
+!assets/*.obj
